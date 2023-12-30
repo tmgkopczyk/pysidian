@@ -16,8 +16,6 @@ def get_filepaths(directory):
                 file_paths.append(filepath)
     return file_paths
 
-files = get_filepaths(r"C:\Users\Troy\Algonquin\Fall 2023")
-
 def get_file_extensions(files):
     file_extensions = []
     for i in range(len(files)):
@@ -28,8 +26,6 @@ def get_file_extensions(files):
             file_data["module"] = file.split("\\")[-2]
         file_extensions.append(file_data)
     return file_extensions
-
-file_extensions = get_file_extensions(files)
 
 def organize_files(file_list):
     organized_files = {}
@@ -42,20 +38,62 @@ def organize_files(file_list):
         organized_files[file["term"]][file["subject"]].append(file)
     return organized_files
 
-organized_files = organize_files(file_extensions)
+def convert_networking_fundamentals_presentation(file):
+    presentation = {}
+    if file.endswith("pptx"):
+        prs = pptx.Presentation(file)
+        # get the presentation title from the title of the first slide
+        try:
+            presentation["title"] = prs.slides[0].shapes.title.text
+        except AttributeError:
+            presentation["title"] = "Untitled"
+        # get the presentation slides
+        slides = get_networking_slides(prs.slides)
+        presentation["slides"] = slides
+    return presentation
 
-def make_obsidian_folders(obsidian_directory,organized_folders):
-    for term in organized_folders.keys():
-        term_directory = os.path.join(obsidian_directory,term)
-        print(term_directory)
-        for subject in organized_folders[term].keys():
-            subject_directory = os.path.join(term_directory,subject)
-            print(subject_directory)
-            for file in organized_files[term][subject]:
-                if file.get("module") != None:
-                    module_directory = os.path.join(subject_directory,file["module"])
-                    print(module_directory)
+def get_networking_slides(slides):
+    slide_list = []
+    section_dict = {}
+    section_slides = []
+    for slide_index,slides in enumerate(slides):
+        if slide_index == 0:
+            continue
+        else:
+            slide_list.append(get_networking_slide_content(slides))
+    return slide_list
+
+def get_networking_slide_content(slide):
+    slide_dict = {
+        "title": "",
+        "content": []
+    }
+    try:
+        slide_dict["title"] = slide.shapes.title.text
+    except AttributeError:
+        slide_dict["title"] = "Untitled"
+    for shape in slide.shapes:
+        if shape.has_text_frame:
+            if shape.text_frame.text.strip() != "" and shape.text_frame.text.strip() != slide_dict["title"]:
+                if len(shape.text_frame.text.strip()) > 2:
+                    slide_dict["content"].append(shape.text_frame.text.strip())
                 else:
-                    print(subject_directory)
+                    continue
+            else:
+                continue
+    return slide_dict
 
-make_obsidian_folders(r"C:\Users\Troy\Obsidian\College",organized_files)
+def main():
+    files = get_filepaths(r"C:\Users\Troy\Algonquin\Fall 2023")
+    file_extensions = get_file_extensions(files)
+    organized_files = organize_files(file_extensions)
+    for term in organized_files.keys():
+        for subject in organized_files[term].keys():
+            for file in organized_files[term][subject]:
+                if file["subject"] == "Networking Fundamentals":
+                    presentation = convert_networking_fundamentals_presentation(file["file_path"])
+                    print(presentation)
+
+
+if __name__ == '__main__':
+    main()

@@ -56,11 +56,13 @@ def get_networking_slides(slides):
     slide_list = []
     section_dict = {}
     section_slides = []
-    for slide_index,slides in enumerate(slides):
+    for slide_index,slide in enumerate(slides):
         if slide_index == 0:
             continue
         else:
-            slide_list.append(get_networking_slide_content(slides))
+            slide_contents = get_networking_slide_content(slide)
+            slide_list.append(slide_contents)
+
     return slide_list
 
 def get_networking_slide_content(slide):

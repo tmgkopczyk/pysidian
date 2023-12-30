@@ -43,3 +43,19 @@ def organize_files(file_list):
     return organized_files
 
 organized_files = organize_files(file_extensions)
+
+def make_obsidian_folders(obsidian_directory,organized_folders):
+    for term in organized_folders.keys():
+        term_directory = os.path.join(obsidian_directory,term)
+        print(term_directory)
+        for subject in organized_folders[term].keys():
+            subject_directory = os.path.join(term_directory,subject)
+            print(subject_directory)
+            for file in organized_files[term][subject]:
+                if file.get("module") != None:
+                    module_directory = os.path.join(subject_directory,file["module"])
+                    print(module_directory)
+                else:
+                    print(subject_directory)
+
+make_obsidian_folders(r"C:\Users\Troy\Obsidian\College",organized_files)

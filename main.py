@@ -1,101 +1,182 @@
 import os
 import pptx
+from html2text import html2text
+import json
 
-# create a Python function to get a list of files in a directory, including all files within subdirectories and return them as full paths
 def get_filepaths(directory):
-    # list of file paths
     file_paths = []
-    # walk the directory tree
     for root, directories, files in os.walk(directory):
-        for filename in files:
-            if "Slides" not in root:
-                continue
-            else:
-                # join the two strings to form the full filepath
+        if "Slides" in root:
+            for filename in files:
                 filepath = os.path.join(root, filename)
                 file_paths.append(filepath)
     return file_paths
 
-def get_file_extensions(files):
-    file_extensions = []
-    for i in range(len(files)):
-        file = files[i]
-        file_data = {"subject": file.split("\\")[5], "filename": file.split("\\")[-1][:file.index(".") - (len(file))],
-                     "file_extension": file.split(".")[-1],"term":file.split("\\")[4],"file_path":file}
-        if "Numeracy and Logic" in file_data["subject"]:
-            file_data["module"] = file.split("\\")[-2]
-        file_extensions.append(file_data)
-    return file_extensions
+files = get_filepaths(r"C:\Users\Troy\Algonquin\Fall 2023")
 
-def organize_files(file_list):
-    organized_files = {}
-    # organize files by term, and then by subect
-    for file in file_list:
-        if file["term"] not in organized_files.keys():
-            organized_files[file["term"]] = {}
-        if file["subject"] not in organized_files[file["term"]].keys():
-            organized_files[file["term"]][file["subject"]] = []
-        organized_files[file["term"]][file["subject"]].append(file)
-    return organized_files
+def get_slides(presentation_slides):
+    slides = []
+    section_dict = {
+        "section": "",
+        "slides": []
+    }
+    for slide_index, slide in enumerate(presentation_slides):
+        slide_content = get_slide_content(slide)
+        # if section key in slide_content, then it is a new section
+        if "section" in slide_content:
+            # if the section is not empty, then add it to the slides
+            if section_dict["section"] != "":
+                slides.append(section_dict)
+            # create a new section
+            section_dict = slide_content
+        else:
+            section_dict["slides"].append(slide_content)
+        # if we are on the last slide, then add the last section
+    slides.append(section_dict)
+    return slides
 
-def convert_networking_fundamentals_presentation(file):
-    presentation = {}
-    if file.endswith("pptx"):
-        prs = pptx.Presentation(file)
-        # get the presentation title from the title of the first slide
+def get_slide_content(slide):
+    if slide.slide_layout.name == "3_Segue":
+        # begin new section
+        section_dict = {
+            "section":"",
+            "slides":[]
+        }
+
+        # get the section title from the title of the slide
         try:
-            presentation["title"] = prs.slides[0].shapes.title.text
+            section_title = slide.shapes.title.text
         except AttributeError:
-            presentation["title"] = "Untitled"
-        # get the presentation slides
-        slides = get_networking_slides(prs.slides)
-        presentation["slides"] = slides
+            section_title = ""
+        section_dict["section"] = section_title
+        return section_dict
+    else:
+        slide_dict = {
+            "title":"",
+            "content":[]
+        }
+        # get the title of the slide
+        try:
+            title = slide.shapes.title.text
+        except AttributeError:
+            title = ""
+        slide_dict["title"] = title
+        for shape in slide.shapes:
+            try:
+                if shape.has_text_frame:
+                    if shape.text == slide_dict["title"]:
+                        continue
+                    else:
+                        for paragraph in shape.text_frame.paragraphs:
+                            if paragraph.text.strip() == "":
+                                continue
+                            if len(paragraph.text) <= 2:
+                                continue
+                            else:
+                                if paragraph.level == 0:
+                                    slide_dict["content"].append(paragraph.text)
+                                elif paragraph.level < 0:
+                                    slide_dict["content"].append("\t" * paragraph.level + "- " + paragraph.text)
+                elif shape.has_table:
+                    # get the table as a list of lists
+                    # and then convert it to a markdown table
+                    table = []
+                    table_content = ""
+                    table_content += "\n"
+                    for row in shape.table.rows:
+                        table_row = []
+                        for cell in row.cells:
+                            table_row.append(" ".join(cell.text.split()))
+                        table.append(table_row)
+                    # convert the table to markdown
+                    for row in table:
+                        # if it is the first row, then it is the header
+                        if row == table[0]:
+                            table_content += "|"
+                            for cell in row:
+                                table_content += cell + "|"
+                            table_content += "\n"
+                            table_content += "|"
+                            for cell in row:
+                                table_content += ":-----:|"
+                            table_content += "\n"
+                        else:
+                            # if it is not the first row, then it is a normal row
+                            table_content += "| "
+                            if row != table[-1]:
+                                for cell in row:
+                                    table_content += cell + " | "
+                            else:
+                                for cell in row:
+                                    table_content += cell + " |"
+
+
+                            table_content += "\n"
+                    slide_dict["content"].append(table_content)
+
+            except AttributeError:
+                continue
+        return slide_dict
+def handle_networking_fundamentals(file_path):
+    presentation = {}
+    prs = pptx.Presentation(file_path)
+    # get the title of the presentation from the title of the first slide
+    try:
+        presentation_title = prs.slides[0].shapes.title.text
+    except AttributeError:
+        presentation_title = ""
+    presentation["title"] = presentation_title
+    slides = get_slides(prs.slides)
+    presentation["slides"] = slides
+
     return presentation
 
-def get_networking_slides(slides):
-    slide_list = []
-    section_dict = {}
-    section_slides = []
-    for slide_index,slide in enumerate(slides):
-        if slide_index == 0:
-            continue
-        else:
-            slide_contents = get_networking_slide_content(slide)
-            slide_list.append(slide_contents)
-
-    return slide_list
-
-def get_networking_slide_content(slide):
-    slide_dict = {
-        "title": "",
-        "content": []
-    }
-    try:
-        slide_dict["title"] = slide.shapes.title.text
-    except AttributeError:
-        slide_dict["title"] = "Untitled"
-    for shape in slide.shapes:
-        if shape.has_text_frame:
-            if shape.text_frame.text.strip() != "" and shape.text_frame.text.strip() != slide_dict["title"]:
-                if len(shape.text_frame.text.strip()) > 2:
-                    slide_dict["content"].append(shape.text_frame.text.strip())
-                else:
-                    continue
-            else:
-                continue
-    return slide_dict
-
 def main():
-    files = get_filepaths(r"C:\Users\Troy\Algonquin\Fall 2023")
-    file_extensions = get_file_extensions(files)
-    organized_files = organize_files(file_extensions)
-    for term in organized_files.keys():
-        for subject in organized_files[term].keys():
-            for file in organized_files[term][subject]:
-                if file["subject"] == "Networking Fundamentals":
-                    presentation = convert_networking_fundamentals_presentation(file["file_path"])
-                    print(presentation)
+    presentations = []
+    for file in files:
+        if "Networking Fundamentals" in file:
+            presentations.append(handle_networking_fundamentals(file))
+    for presentation in presentations:
+        create_presentation_folder("Networking Fundamentals",presentation)
 
+class ObsidianVault:
+    def __init__(self,path):
+        self.path = path
 
-if __name__ == '__main__':
+    def create_folder(self,folder_path):
+        if not os.path.exists(os.path.join(self.path,folder_path)):
+            os.mkdir(os.path.join(self.path,folder_path))
+        else:
+            pass
+vault = ObsidianVault(r"C:\Users\Troy\Obsidian\College")
+
+def create_presentation_folder(subject, presentation):
+    invalid_chars = ["\\","/",":","*","?","\"","<",">","|"]
+    # create a folder for the presentation inside the subject folder
+    presentation_folder_name = presentation["title"]
+    presentation_folder_name = presentation_folder_name.split(": ")[1]
+    vault.create_folder(os.path.join(subject,presentation_folder_name))
+    # create a folder for each section inside the presentation folder
+    for section in presentation["slides"]:
+        section_folder_name = section["section"].split(" ",1)[1]
+        section_path = os.path.join(subject,presentation_folder_name,section_folder_name)
+        vault.create_folder(section_path)
+        # create a markdown file for each slide inside the section folder
+        for slide in section["slides"]:
+            if "\x0b" in slide["title"]:
+                slide["title"] = slide["title"].split("\x0b")[1]
+            slide_file_name = slide["title"]
+            for char in invalid_chars:
+                slide_file_name = slide_file_name.replace(char,"")
+            slide_file_name = slide_file_name + ".md"
+            try:
+                with open(os.path.join(vault.path,section_path,slide_file_name),"w",encoding="utf-8") as slide_file:
+                    for content in slide["content"]:
+                        slide_file.write(content)
+                        slide_file.write("\n")
+
+            except OSError:
+                continue
+if __name__ == "__main__":
     main()
+

@@ -170,7 +170,7 @@ def create_presentation_folder(subject, presentation):
                 slide_file_name = slide_file_name.replace(char,"")
             slide_file_name = slide_file_name + ".md"
             try:
-                with open(os.path.join(vault.path,section_path,slide_file_name),"w",encoding="utf-8") as slide_file:
+                with open(str(os.path.join(str(vault.path),str(section_path),str(slide_file_name))),"w",encoding="utf-8") as slide_file:
                     for content in slide["content"]:
                         slide_file.write(content)
                         slide_file.write("\n")

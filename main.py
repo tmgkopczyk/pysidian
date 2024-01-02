@@ -68,7 +68,8 @@ def get_slide_content(slide, subject):
         else:
             slide_dict = {
                 "title": "",
-                "content": []
+                "content": [],
+                "pictures": []
             }
             # get the title of the slide
             try:
@@ -89,9 +90,14 @@ def get_slide_content(slide, subject):
                                         shape.fill.fore_color.rgb[1] == 176 and shape.fill.fore_color.rgb[2] == 80 or \
                                         shape.fill.fore_color.rgb[0] == 8 and shape.fill.fore_color.rgb[1] == 8 and \
                                         shape.fill.fore_color.rgb[2] == 8:
-                                    slide_dict["content"].append("```")
-                                    slide_dict["content"].append(shape.text)
-                                    slide_dict["content"].append("```")
+                                    if shape.text.strip() == "":
+                                        continue
+                                    else:
+                                        # append as code block
+                                        slide_dict["content"].append("```")
+                                        slide_dict["content"].append(shape.text)
+                                        slide_dict["content"].append("```")
+
                                 else:
                                     continue
                             except AttributeError:
@@ -142,13 +148,24 @@ def get_slide_content(slide, subject):
                                     table_content += table[i][j] + "|"
                                 table_content += "\n"
                         slide_dict["content"].append(table_content)
+                    elif shape.shape_type == 13:
+                        # picture
+                        # get the picture from the slide
+                        picture = shape.image.blob
+                        # save the picture blob to the dictionary
+                        slide_dict["pictures"].append(picture)
+                    else:
+                        continue
+
+
                 except AttributeError:
                     continue
             return slide_dict
     elif subject == "Achieving Success In Changing Environments":
         slide_dict = {
             "title": "",
-            "content": []
+            "content": [],
+            "pictures": []
         }
         try:
             title = slide.shapes.title.text
@@ -166,6 +183,9 @@ def get_slide_content(slide, subject):
                                 continue
                             else:
                                 slide_dict["content"].append(" " * paragraph.level + "- " + html2text(paragraph.text).strip())
+                    elif shape.shape_type == 13:
+                        picture = shape.image.blob
+                        slide_dict["pictures"].append(picture)
                 except AttributeError:
                     slide_dict["content"].append(shape)
         return slide_dict
@@ -257,6 +277,11 @@ def create_presentation_folder(subject, presentation):
                         for content in slide["content"]:
                             slide_file.write(content)
                             slide_file.write("\n")
+                    if slide.get("pictures"):
+                        for picture_index, picture in enumerate(slide["pictures"]):
+                            with open(str(os.path.join(str(vault.path), str(section_path),
+                                                       str(slide_file_name + "_" + str(picture_index) + ".png"))), "wb") as picture_file:
+                                picture_file.write(picture)
 
                 except OSError:
                     continue
@@ -283,10 +308,14 @@ def create_presentation_folder(subject, presentation):
                     for content in slide["content"]:
                         slide_file.write(content)
                         slide_file.write("\n")
+                    if slide.get("pictures"):
+                        for picture_index, picture in enumerate(slide["pictures"]):
+                            with open(str(os.path.join(str(vault.path), str(subject), str(presentation_folder_name),
+                                                       str(slide_file_name + "_" + str(picture_index) + ".png"))), "wb") as picture_file:
+                                picture_file.write(picture)
 
             except OSError:
                 continue
-
 
 if __name__ == "__main__":
     main()

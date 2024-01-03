@@ -7,14 +7,14 @@ import json
 def get_filepaths(directory):
     file_paths = []
     for root, directories, files in os.walk(directory):
-        if "Slides" in root:
+        if "Theory" in root:
             for filename in files:
                 filepath = os.path.join(root, filename)
                 file_paths.append(filepath)
     return file_paths
 
 
-files = get_filepaths(r"C:\Users\Troy\Algonquin\Fall 2023")
+files = get_filepaths(r"C:\Users\Troy\Algonquin College")
 
 
 def get_slides(presentation_slides, subject):
@@ -154,6 +154,7 @@ def get_slide_content(slide, subject):
                         picture = shape.image.blob
                         # save the picture blob to the dictionary
                         slide_dict["pictures"].append(picture)
+
                     else:
                         continue
 
@@ -270,9 +271,9 @@ def create_presentation_folder(subject, presentation):
                 slide_file_name = slide["title"]
                 for char in invalid_chars:
                     slide_file_name = slide_file_name.replace(char, "")
-                slide_file_name = slide_file_name + ".md"
+                slide_md_file = slide_file_name + ".md"
                 try:
-                    with open(str(os.path.join(str(vault.path), str(section_path), str(slide_file_name))), "w",
+                    with open(str(os.path.join(str(vault.path), str(section_path), str(slide_md_file))), "w",
                               encoding="utf-8") as slide_file:
                         for content in slide["content"]:
                             slide_file.write(content)
@@ -282,6 +283,15 @@ def create_presentation_folder(subject, presentation):
                             with open(str(os.path.join(str(vault.path), str(section_path),
                                                        str(slide_file_name + "_" + str(picture_index) + ".png"))), "wb") as picture_file:
                                 picture_file.write(picture)
+                                # embed the picture in the corresponding markdown file
+                                with open(str(os.path.join(str(vault.path), str(section_path), str(slide_md_file))), "a", encoding="utf-8") as slide_file:
+                                    slide_file.write("\n")
+                                    # write the link to the picture as the full path to the picture
+                                    slide_file.write("![picture](" + str(os.path.join(str(vault.path), str(section_path),
+                                                                                      str(slide_file_name + "_" + str(picture_index) + ".png"))).replace(" ","%20") + ")")
+                                    # replace spaces with %20
+                                    picture_name = slide_file_name + "_" + str(picture_index) + ".png"
+                                    slide_file.write("\n")
 
                 except OSError:
                     continue

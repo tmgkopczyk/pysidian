@@ -276,11 +276,16 @@ def create_presentation_folder(presentation,subject):
 
 def main():
     for file in files:
-        file_details = file.split("\\")[4:]
-        semester = file_details[0]
-        course = file_details[1]
-        file_name = file_details[-1]
-        file_extension = file_name.split(".")[-1]
+        file_details = file.split("\\")
+        if file_details[-1].split(".")[-1] == "pptx":
+            subject = file.split("\\")[5]
+            pptx_presentation = get_pptx_presentation(file)
+            create_presentation_folder(pptx_presentation,subject)
+        else:
+            continue
+
+
+
 
 class ObsidianVault:
     def __init__(self, path):
@@ -295,89 +300,6 @@ class ObsidianVault:
 
 vault = ObsidianVault(r"C:\Users\Troy\Obsidian\College")
 
-
-def create_presentation_folder(subject, presentation):
-    invalid_chars = ["\\", "/", ":", "*", "?", "\"", "<", ">", "|"]
-    # create a folder for the presentation inside the subject folder
-    presentation_folder_name = presentation["title"]
-    if subject == "Networking Fundamentals":
-        for char in invalid_chars:
-            if char in presentation_folder_name:
-                presentation_folder_name = presentation_folder_name.replace(char, "")
-        try:
-            os.mkdir(os.path.join(vault.path, subject))
-        except FileExistsError:
-            pass
-        vault.create_folder(os.path.join(subject, presentation_folder_name))
-        # create a folder for each section inside the presentation folder
-        for section in presentation["slides"]:
-            section_folder_name = section["section"].split(" ", 1)[1]
-            section_path = os.path.join(subject, presentation_folder_name, section_folder_name)
-            vault.create_folder(section_path)
-            # create a markdown file for each slide inside the section folder
-            for slide in section["slides"]:
-                if "\x0b" in slide["title"]:
-                    slide["title"] = slide["title"].split("\x0b")[1]
-                slide_file_name = slide["title"]
-                for char in invalid_chars:
-                    slide_file_name = slide_file_name.replace(char, "")
-                slide_md_file = slide_file_name + ".md"
-                try:
-                    with open(str(os.path.join(str(vault.path), str(section_path), str(slide_md_file))), "w",
-                              encoding="utf-8") as slide_file:
-                        for content in slide["content"]:
-                            slide_file.write(content)
-                            slide_file.write("\n")
-                    if slide.get("pictures"):
-                        for picture_index, picture in enumerate(slide["pictures"]):
-                            with open(str(os.path.join(str(vault.path), str(section_path),
-                                                       str(slide_file_name + "_" + str(picture_index) + ".png"))), "wb") as picture_file:
-                                picture_file.write(picture)
-                                # embed the picture in the corresponding markdown file
-                                with open(str(os.path.join(str(vault.path), str(section_path), str(slide_md_file))), "a", encoding="utf-8") as slide_file:
-                                    slide_file.write("\n")
-                                    # write the link to the picture as the full path to the picture
-                                    slide_file.write("![picture](" + str(os.path.join(str(vault.path), str(section_path),
-                                                                                      str(slide_file_name + "_" + str(picture_index) + ".png"))).replace(" ","%20") + ")")
-                                    # replace spaces with %20
-                                    picture_name = slide_file_name + "_" + str(picture_index) + ".png"
-                                    slide_file.write("\n")
-
-                except OSError:
-                    continue
-    elif subject == "Achieving Success In Changing Environments":
-        for char in invalid_chars:
-            if char in presentation_folder_name:
-                presentation_folder_name = presentation_folder_name.replace(char, "")
-
-        try:
-            os.mkdir(os.path.join(vault.path, subject))
-        except FileExistsError:
-            pass
-        vault.create_folder(os.path.join(subject, presentation_folder_name))
-        for slide in presentation["slides"]:
-            if "\x0b" in slide["title"]:
-                slide["title"] = slide["title"].split("\x0b")[1]
-            slide_file_name = slide["title"]
-            for char in invalid_chars:
-                slide_file_name = slide_file_name.replace(char, "")
-            slide_file_name = slide_file_name + ".md"
-            try:
-                with open(str(os.path.join(str(vault.path), str(subject), str(presentation_folder_name),
-                                           str(slide_file_name))), "w", encoding="utf-8") as slide_file:
-                    for content in slide["content"]:
-                        slide_file.write(content)
-                        slide_file.write("\n")
-                    if slide.get("pictures"):
-                        for picture_index, picture in enumerate(slide["pictures"]):
-                            with open(str(os.path.join(str(vault.path), str(subject), str(presentation_folder_name),
-                                                       str(slide_file_name + "_" + str(picture_index) + ".png"))), "wb") as picture_file:
-                                picture_file.write(picture)
-
-            except OSError:
-                continue
-
-if __name__ == "__main__":
 
 if __name__ == "__main__":
     main()

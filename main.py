@@ -378,6 +378,4 @@ def create_presentation_folder(subject, presentation):
                 continue
 
 if __name__ == "__main__":
-
-if __name__ == "__main__":
     main()

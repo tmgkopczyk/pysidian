@@ -2,7 +2,7 @@ import os
 import pptx
 from html2text import html2text
 import json
-import re
+
 
 def get_filepaths(directory):
     file_paths = []
@@ -17,118 +17,367 @@ def get_filepaths(directory):
 files = get_filepaths(r"C:\Users\Troy\Algonquin College")
 
 
-def main():
-    for file in files:
-        extension = file.split(".")[-1]
-        if extension == "pptx":
-            #print(file)
-            pptx_presentation = get_pptx_presentation(file)
-            #print(pptx_presentation)
-
-def get_pptx_presentation(file):
-    presentation_dict = {"title":"","slides":[]}
-    try:
-        prs = pptx.Presentation(file)
-        pptx_slides = get_pptx_slides(prs.slides)
-        return pptx_slides
-    except pptx.exc.PackageNotFoundError:
-        print("File is not a pptx file")
-        return None
-
-def get_pptx_slides(presentation):
-    slide_list = []
-    for slide in presentation:
+def get_slides(presentation_slides):
+    slides = []
+    section_dict = {
+        "section": "",
+        "slides": []
+    }
+    for slide_index, slide in enumerate(presentation_slides):
         slide_content = get_pptx_slide_content(slide)
-        if any(slide_content.values()):
-            if slide_content.get("title") == "":
-                try:
-                    slide_content["title"] = slide_content["content"][0]
-                    slide_content["content"].pop(0)
-                except IndexError:
-                    pass
-            print(slide_content)
-            slide_list.append(slide_content)
+        # if section key in slide_content, then it is a new section
+        if "section" in slide_content:
+            # if the section is not empty, then add it to the slides
+            if section_dict["section"] != "":
+                slides.append(section_dict)
+            # create a new section
+            section_dict = slide_content
         else:
-            pass
-    return slide_list
+            section_dict["slides"].append(slide_content)
+        # if we are on the last slide, then add the last section
+    slides.append(section_dict)
+    return slides
+
 
 def get_pptx_slide_content(slide):
-    slide_dict = {
-        "title":"",
-        "content":[],
-        "images":[]
-    }
-    try:
-        title = slide.shapes.title.text
-    except AttributeError:
-        title = ""
-        for shape in slide.shapes:
-            if shape.has_text_frame:
-                title = shape.text
-                break
-    # using regex, find any unicode characters in the title that are outside the ASCII range and convert the title to a list of strings
-    regex = re.split(r"[\x0b+\xa0]",title)
-    _slide_list = [x for x in regex if x != ""]
-    if not _slide_list:
-        pass
+    if slide.slide_layout.name == "3_Segue":
+        # begin new section
+        section_dict = {
+            "section": "",
+            "slides": []
+        }
+
+        # get the section title from the title of the slide
+        try:
+            section_title = slide.shapes.title.text
+        except AttributeError:
+            section_title = ""
+        section_dict["section"] = section_title
+        return section_dict
     else:
-        if len(_slide_list) == 2:
-            if (_slide_list[0][-1].islower() or _slide_list[0][-1].isupper() or (_slide_list[0][-1].isdigit() and _slide_list[1][0].isdigit() is False)) and (_slide_list[1][0].isupper() or _slide_list[1][0].isdigit()):
-                slide_dict["section"] = _slide_list[0]
-                slide_dict["title"] = _slide_list[-1]
-            elif _slide_list[0][-1] == " " or _slide_list[0][-1] == ":" or _slide_list[0][-1] == ",":
-                _slide_list = " ".join([x.strip() for x in _slide_list])
-                slide_dict["title"] = _slide_list
-            elif _slide_list[0][-1].islower() and _slide_list[1][0].islower():
-                _slide_list = " ".join([x.strip() for x in _slide_list if x.strip() != ""])
-                slide_dict["title"] = _slide_list
-            elif _slide_list[-1][0] == " " and _slide_list[0][-1] != " ":
-                _slide_list = " ".join([x.strip() for x in _slide_list if x.strip() != ""])
-                slide_dict["title"] = _slide_list
-            else:
-                _slide_list = " ".join([x.strip() for x in _slide_list])
-                slide_dict["title"] = _slide_list
-        elif len(_slide_list) == 1:
-            slide_dict["title"] = _slide_list[0]
-        elif len(_slide_list) > 2:
-            if _slide_list[-1][0].islower():
-                slide_dict["title"] = " ".join([x.strip() for x in _slide_list if x.strip() != ""])
-            elif _slide_list[0][-1] == ":":
-                slide_dict["title"] = " ".join([x.strip() for x in _slide_list if x.strip() != ""])
-            # if the first character of each item in the list is an uppercase letter, then join the list into a string
-            elif _slide_list[0][0].isupper() and _slide_list[1][0].isupper():
-                slide_dict["title"] = " ".join([x.strip() for x in _slide_list if x.strip() != ""])
-            elif _slide_list[-2] == "–" or _slide_list[-2].islower():
-                slide_dict["title"] = " ".join([x.strip() for x in _slide_list if x.strip() != ""])
-            else:
-                slide_dict["title"] = " ".join([x.strip() for x in _slide_list if x.strip() != ""])
-    image_count = 0
-    for shape in slide.shapes:
-        if shape.has_text_frame:
-            if shape.text == title:
-                pass
-            else:
-                for paragraph in shape.text_frame.paragraphs:
-                    paragraph_text = ""
-                    if len(paragraph.text.strip()) <=2:
-                        pass
-                    elif paragraph.text.strip() == "":
-                        pass
+        slide_dict = {
+            "title": "",
+            "content": [],
+            "pictures": []
+        }
+        # get the title of the slide
+        try:
+            title = slide.shapes.title.text
+        except AttributeError:
+            title = ""
+        slide_dict["title"] = title
+        for shape in slide.shapes:
+            try:
+                if shape.has_text_frame:
+                    if shape.text == slide_dict["title"]:
+                        continue
                     else:
-                        for run in paragraph.runs:
-                            if run.font.name is None:
-                                # get the font from the slide master
-                                for shape_l in slide.slide_layout.slide_master.slide_layouts.get_by_name(slide.slide_layout.name).shapes:
-                                    if shape_l.shape_type == shape.shape_type:
-                                        for paragraph_l in shape_l.text_frame.paragraphs:
-                                            for run_l in paragraph_l.runs:
-                                                print(run_l.font.bold)
+                        try:
+                            shape.fill.solid()
+                            if shape.fill.fore_color.rgb[0] == 0 and shape.fill.fore_color.rgb[1] == 0 and \
+                                    shape.fill.fore_color.rgb[2] == 0 or shape.fill.fore_color.rgb[0] == 0 and \
+                                    shape.fill.fore_color.rgb[1] == 176 and shape.fill.fore_color.rgb[2] == 80 or \
+                                    shape.fill.fore_color.rgb[0] == 8 and shape.fill.fore_color.rgb[1] == 8 and \
+                                    shape.fill.fore_color.rgb[2] == 8:
+                                if shape.text.strip() == "":
+                                    continue
+                                else:
+                                    # append as code block
+                                    slide_dict["content"].append("```")
+                                    slide_dict["content"].append(shape.text)
+                                    slide_dict["content"].append("```")
+
+                            else:
+                                continue
+                        except AttributeError:
+                            # append as regular text
+                            for paragraph in shape.text_frame.paragraphs:
+                                try:
+                                    if "(" in paragraph.text[0] and ")" in paragraph.text[-1]:
+                                        continue
+                                    elif paragraph.text.strip() == "" or len(paragraph.text.strip()) <= 3:
+                                        continue
+                                    else:
+                                        # append paragraph text to slide content based on level
+                                        if paragraph.level == 0:
+                                            slide_dict["content"].append(paragraph.text)
+                                        elif paragraph.level > 0:
+                                            slide_dict["content"].append(
+                                                " " * paragraph.level + "- " + paragraph.text)
+                                except IndexError:
+                                    continue
+                elif shape.has_table:
+                    # get the table as a list of lists
+                    table = []
+                    for row in shape.table.rows:
+                        table_row = []
+                        for cell in row.cells:
+                            if cell.text.strip() == "":
+                                continue
+                            else:
+                                table_row.append(" ".join(cell.text.split()))
+                        table.append(table_row)
+                    # append the table to the slide content as a markdown table
+                    table_content = ""
+                    table_content += "\n"
+                    for i in range(len(table)):
+                        # if it is the first row, then add the header and a separator
+                        if i == 0:
+                            table_content += "|"
+                            for j in range(len(table[i])):
+                                table_content += table[i][j] + "|"
+                            table_content += "\n"
+                            table_content += "|"
+                            for j in range(len(table[i])):
+                                table_content += "---|"
+                            table_content += "\n"
+                        else:
+                            table_content += "|"
+                            for j in range(len(table[i])):
+                                table_content += table[i][j] + "|"
+                            table_content += "\n"
+                    slide_dict["content"].append(table_content)
+                elif shape.shape_type == 13:
+                    # picture
+                    # get the picture from the slide
+                    picture = shape.image.blob
+                    # save the picture blob to the dictionary
+                    slide_dict["pictures"].append(picture)
+                else:
+                    continue
 
 
-        elif shape.shape_type == 13:
-            image_count += 1
-            slide_dict["images"].append(f"{slide_dict['title'].lower().replace(' ','_')}_{image_count}")
-    return slide_dict
+            except AttributeError:
+                continue
+        return slide_dict
+
+def get_pptx_presentation(file):
+    subject_items = file.split("\\")[5].split(" ",1)
+    presentation_dict = {}
+    try:
+        prs = pptx.Presentation(file)
+        title_slide = prs.slides[0]
+        try:
+            prs_title = title_slide.shapes.title.text
+            if prs_title.strip() == subject_items[-1].strip() or prs_title.strip() == subject_items[0].strip():
+                for shape in title_slide.shapes:
+                    if shape.has_text_frame:
+                        if shape.text.strip() == title_slide.shapes.title.text.strip():
+                            continue
+                        else:
+                            prs_title = html2text(shape.text).strip()
+            else:
+                prs_title = html2text(title_slide.shapes.title.text).strip()
+            presentation_dict["title"] = prs_title
+            presentation_dict["slides"] = get_slides(prs.slides)
+            return presentation_dict
+        except AttributeError:
+            prs_title = ""
+            for shape in title_slide.shapes:
+                if shape.has_text_frame:
+                    if shape.text.strip() == "":
+                        continue
+                    else:
+                        prs_title = html2text(shape.text).strip()
+            presentation_dict["title"] = prs_title
+            return presentation_dict
+    except pptx.exc.PackageNotFoundError:
+        return "This file is not a pptx file"
+
+
+def create_presentation_folder(presentation,subject):
+    invalid_chars = ["\\", "/", ":", "*", "?", "\"", "<", ">", "|"]
+    # create a folder for the presentation inside the subject folder
+    presentation_folder_name = presentation["title"]
+    for char in invalid_chars:
+        if char in presentation_folder_name:
+            presentation_folder_name = presentation_folder_name.replace(char, "")
+    try:
+        os.mkdir(os.path.join(vault.path, subject))
+    except FileExistsError:
+        pass
+    try:
+        vault.create_folder(os.path.join(subject, presentation_folder_name))
+    except Exception as e:
+        print(e)
+        pass
+    # create a folder for each section inside the presentation folder
+    if presentation.get("slides"):
+        for section in presentation["slides"]:
+            if section.get("section") != "":
+                section_folder_name = section["section"].split(" ", 1)[1]
+                section_path = os.path.join(subject, presentation_folder_name, html2text(section_folder_name).strip())
+                vault.create_folder(section_path)
+                # create a markdown file for each slide inside the section folder
+                if section.get("slides"):
+                    for slide in section["slides"]:
+                        if "\x0b" in slide["title"]:
+                            slide["title"] = slide["title"].split("\x0b")[-1]
+                        slide_file_name = slide["title"]
+                        for char in invalid_chars:
+                            slide_file_name = slide_file_name.replace(char, "")
+                        slide_md_file = slide_file_name + ".md"
+                        try:
+                            with open(str(os.path.join(str(vault.path), str(section_path), str(slide_md_file))), "w",
+                                      encoding="utf-8") as slide_file:
+                                for content in slide["content"]:
+                                    slide_file.write(content)
+                                    slide_file.write("\n")
+                            if slide.get("pictures"):
+                                for picture_index, picture in enumerate(slide["pictures"]):
+                                    with open(str(os.path.join(str(vault.path), str(section_path),
+                                                               str(slide_file_name + "_" + str(picture_index) + ".png"))),
+                                              "wb") as picture_file:
+                                        picture_file.write(picture)
+                                        # embed the picture in the corresponding markdown file
+                                        with open(str(os.path.join(str(vault.path), str(section_path), str(slide_md_file))), "a",
+                                                  encoding="utf-8") as slide_file:
+                                            slide_file.write("\n")
+                                            # write the link to the picture as the full path to the picture
+                                            slide_file.write(f"![[{slide_file_name + '_' + str(picture_index)}.png]]")
+
+                        except OSError:
+                            continue
+            else:
+                if section.get("slides"):
+                    for slide in section["slides"]:
+                        if "\x0b" in slide["title"]:
+                            slide["title"] = slide["title"].split("\x0b")[-1]
+                        slide_file_name = slide["title"]
+                        for char in invalid_chars:
+                            slide_file_name = slide_file_name.replace(char, "")
+                        slide_md_file = slide_file_name + ".md"
+                        try:
+                            with open(str(os.path.join(str(vault.path),presentation_folder_name, str(slide_md_file))), "w",
+                                      encoding="utf-8") as slide_file:
+                                for content in slide["content"]:
+                                    slide_file.write(content)
+                                    slide_file.write("\n")
+                            if slide.get("pictures"):
+                                for picture_index, picture in enumerate(slide["pictures"]):
+                                    with open(str(os.path.join(str(vault.path), str(presentation_folder_name), str(slide_file_name + "_" + str(picture_index) + ".png"))),
+                                              "wb") as picture_file:
+                                        picture_file.write(picture)
+                                        # embed the picture in the corresponding markdown file
+                                        with open(str(os.path.join(str(vault.path), str(presentation_folder_name), str(slide_md_file))),
+                                                  "a",
+                                                  encoding="utf-8") as slide_file:
+                                            slide_file.write("\n")
+                                            # write the link to the picture as a wiki link
+                                            slide_file.write(f"![[{slide_file_name + '_' + str(picture_index)}.png]]")
+                        except OSError:
+                            continue
+    else:
+        return "This file is not a pptx file"
+
+
+
+
+
+def main():
+    for file in files:
+        file_details = file.split("\\")[4:]
+        semester = file_details[0]
+        course = file_details[1]
+        file_name = file_details[-1]
+        file_extension = file_name.split(".")[-1]
+
+class ObsidianVault:
+    def __init__(self, path):
+        self.path = path
+
+    def create_folder(self, folder_path):
+        if not os.path.exists(os.path.join(self.path, folder_path)):
+            os.mkdir(os.path.join(self.path, folder_path))
+        else:
+            pass
+
+
+vault = ObsidianVault(r"C:\Users\Troy\Obsidian\College")
+
+
+def create_presentation_folder(subject, presentation):
+    invalid_chars = ["\\", "/", ":", "*", "?", "\"", "<", ">", "|"]
+    # create a folder for the presentation inside the subject folder
+    presentation_folder_name = presentation["title"]
+    if subject == "Networking Fundamentals":
+        for char in invalid_chars:
+            if char in presentation_folder_name:
+                presentation_folder_name = presentation_folder_name.replace(char, "")
+        try:
+            os.mkdir(os.path.join(vault.path, subject))
+        except FileExistsError:
+            pass
+        vault.create_folder(os.path.join(subject, presentation_folder_name))
+        # create a folder for each section inside the presentation folder
+        for section in presentation["slides"]:
+            section_folder_name = section["section"].split(" ", 1)[1]
+            section_path = os.path.join(subject, presentation_folder_name, section_folder_name)
+            vault.create_folder(section_path)
+            # create a markdown file for each slide inside the section folder
+            for slide in section["slides"]:
+                if "\x0b" in slide["title"]:
+                    slide["title"] = slide["title"].split("\x0b")[1]
+                slide_file_name = slide["title"]
+                for char in invalid_chars:
+                    slide_file_name = slide_file_name.replace(char, "")
+                slide_md_file = slide_file_name + ".md"
+                try:
+                    with open(str(os.path.join(str(vault.path), str(section_path), str(slide_md_file))), "w",
+                              encoding="utf-8") as slide_file:
+                        for content in slide["content"]:
+                            slide_file.write(content)
+                            slide_file.write("\n")
+                    if slide.get("pictures"):
+                        for picture_index, picture in enumerate(slide["pictures"]):
+                            with open(str(os.path.join(str(vault.path), str(section_path),
+                                                       str(slide_file_name + "_" + str(picture_index) + ".png"))), "wb") as picture_file:
+                                picture_file.write(picture)
+                                # embed the picture in the corresponding markdown file
+                                with open(str(os.path.join(str(vault.path), str(section_path), str(slide_md_file))), "a", encoding="utf-8") as slide_file:
+                                    slide_file.write("\n")
+                                    # write the link to the picture as the full path to the picture
+                                    slide_file.write("![picture](" + str(os.path.join(str(vault.path), str(section_path),
+                                                                                      str(slide_file_name + "_" + str(picture_index) + ".png"))).replace(" ","%20") + ")")
+                                    # replace spaces with %20
+                                    picture_name = slide_file_name + "_" + str(picture_index) + ".png"
+                                    slide_file.write("\n")
+
+                except OSError:
+                    continue
+    elif subject == "Achieving Success In Changing Environments":
+        for char in invalid_chars:
+            if char in presentation_folder_name:
+                presentation_folder_name = presentation_folder_name.replace(char, "")
+
+        try:
+            os.mkdir(os.path.join(vault.path, subject))
+        except FileExistsError:
+            pass
+        vault.create_folder(os.path.join(subject, presentation_folder_name))
+        for slide in presentation["slides"]:
+            if "\x0b" in slide["title"]:
+                slide["title"] = slide["title"].split("\x0b")[1]
+            slide_file_name = slide["title"]
+            for char in invalid_chars:
+                slide_file_name = slide_file_name.replace(char, "")
+            slide_file_name = slide_file_name + ".md"
+            try:
+                with open(str(os.path.join(str(vault.path), str(subject), str(presentation_folder_name),
+                                           str(slide_file_name))), "w", encoding="utf-8") as slide_file:
+                    for content in slide["content"]:
+                        slide_file.write(content)
+                        slide_file.write("\n")
+                    if slide.get("pictures"):
+                        for picture_index, picture in enumerate(slide["pictures"]):
+                            with open(str(os.path.join(str(vault.path), str(subject), str(presentation_folder_name),
+                                                       str(slide_file_name + "_" + str(picture_index) + ".png"))), "wb") as picture_file:
+                                picture_file.write(picture)
+
+            except OSError:
+                continue
+
+if __name__ == "__main__":
 
 if __name__ == "__main__":
     main()

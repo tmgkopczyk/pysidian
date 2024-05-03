@@ -23,10 +23,11 @@ def main():
     for file in files:
         extension = file.split(".")[-1]
         if extension == "pptx":
-            #if "CST8315" in file or "CST8182" in file:
             pptx_file = get_pptx_presentation(file)
-            # print(pptx_file)
-
+            #print(pptx_file)
+            print(file)
+        else:
+            continue
 
 def get_pptx_slide_content(slide):
     slide_content = {"title": "", "content": []}
@@ -41,9 +42,28 @@ def get_pptx_slide_content(slide):
             else:
                 continue
     slide_title = slide_title.strip()
-    regex = re.match(r"^\S+(?: \S+){0,10}\x0b\S+(?: \S+){0,10}", slide_title)
+    regex = re.match(r"^\S+(?: \S+){0,10}\x0b\S+(?: \S+){0,10}$", slide_title)
     if regex:
-        print(slide_title)
+        _title_list = [x for x in slide_title.split("\x0b") if x.strip() != ""]
+        if _title_list[0][-1].islower() and _title_list[1][0].islower():
+            slide_title = " ".join([x.strip() for x in _title_list])
+        elif _title_list[0][-1] == ":" and _title_list[1][0].isupper():
+            slide_title = " ".join([x.strip() for x in _title_list])
+        else:
+            slide_content["title"] = _title_list[-1]
+            slide_content["section"] = _title_list[0]
+    else:
+        _slide_title = re.findall("\x0b", slide_title)
+        if len(_slide_title) == 1:
+            slide_title = " ".join([x.strip() for x in slide_title.split("\x0b") if x.strip() != ""])
+        else:
+            _slide_title = [x.strip() for x in slide_title.splitlines() if x.strip() != ""]
+            if len(_slide_title) > 1:
+                if [x[0].strip().islower() for x in _slide_title[1:]] == [True] * (len(_slide_title) - 1):
+                    _slide_title = " ".join([x.strip() for x in _slide_title])
+                else:
+                    print(_slide_title)
+        slide_content["title"] = slide_title
     for shape in slide.shapes:
         if shape.has_text_frame:
             if shape.text == slide_title:

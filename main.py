@@ -1,8 +1,7 @@
 import os
 import pptx
 import re
-import pypdf
-from pypdf.errors import PdfReadError
+from html2text import html2text
 
 
 def get_filepaths(directory):
@@ -15,67 +14,69 @@ def get_filepaths(directory):
     return file_paths
 
 
-files = get_filepaths(r"C:\Users\Troy\Algonquin College")
+files = get_filepaths(r"D:\Algonquin College")
 
 
 def main():
     extensions = []
     for file in files:
         extension = file.split(".")[-1]
+        subject = file.split("\\")[3]
         if extension == "pptx":
             pptx_file = get_pptx_presentation(file)
-            #print(pptx_file)
-            print(file)
+            print(pptx_file)
         else:
             continue
+        #else:
+        #    pass
 
 def get_pptx_slide_content(slide):
     slide_content = {"title": "", "content": []}
     try:
-        slide_title = slide.shapes.title.text
+        _slide_title = slide.shapes.title.text
     except AttributeError:
-        slide_title = ""
+        _slide_title = ""
         for shape in slide.shapes:
             if shape.has_text_frame:
-                slide_title = shape.text
-                break
+                if shape.text.strip() == "":
+                    continue
+                else:
+                    _slide_title = shape.text
+                    break
             else:
                 continue
-    slide_title = slide_title.strip()
-    regex = re.match(r"^\S+(?: \S+){0,10}\x0b\S+(?: \S+){0,10}$", slide_title)
-    if regex:
-        _title_list = [x for x in slide_title.split("\x0b") if x.strip() != ""]
+
+    cisco_title_regex = re.match(r"^\S+(?: \S+){0,10}\x0b\S+(?: \S+){0,10}$", _slide_title)
+    if cisco_title_regex:
+        _title_list = _slide_title.split("\x0b")
         if _title_list[0][-1].islower() and _title_list[1][0].islower():
-            slide_title = " ".join([x.strip() for x in _title_list])
+            _title_list = " ".join(_title_list)
         elif _title_list[0][-1] == ":" and _title_list[1][0].isupper():
-            slide_title = " ".join([x.strip() for x in _title_list])
+            _title_list = _title_list[0] + " " + _title_list[1]
         else:
-            slide_content["title"] = _title_list[-1]
-            slide_content["section"] = _title_list[0]
+            slide_title = _title_list[-1]
+            slide_section = _title_list[0]
+            slide_content["title"] = slide_title
+            slide_content["section"] = slide_section
     else:
-        _slide_title = re.findall("\x0b", slide_title)
-        if len(_slide_title) == 1:
-            slide_title = " ".join([x.strip() for x in slide_title.split("\x0b") if x.strip() != ""])
-        else:
-            _slide_title = [x.strip() for x in slide_title.splitlines() if x.strip() != ""]
-            if len(_slide_title) > 1:
-                if [x[0].strip().islower() for x in _slide_title[1:]] == [True] * (len(_slide_title) - 1):
-                    _slide_title = " ".join([x.strip() for x in _slide_title])
-                else:
-                    print(_slide_title)
-        slide_content["title"] = slide_title
+        slide_content["title"] = html2text(_slide_title).strip()
     for shape in slide.shapes:
         if shape.has_text_frame:
-            if shape.text == slide_title:
+            if shape.text.strip() == "":
+                continue
+            elif shape.text == _slide_title:
                 continue
             else:
                 for paragraph in shape.text_frame.paragraphs:
-                    if len(paragraph.text.strip()) <= 2 and paragraph.text.isnumeric():
+                    if paragraph.text.strip() == "":
                         continue
-                    elif paragraph.text.strip() == "":
+                    elif len(paragraph.text.strip()) <= 2 and paragraph.text.strip().isnumeric():
                         continue
                     else:
-                        slide_content["content"].append(paragraph.text)
+                        if paragraph.level > 0:
+                            slide_content["content"].append(" "*paragraph.level + "- " + paragraph.text)
+                        else:
+                            slide_content["content"].append(paragraph.text)
         elif shape.has_table:
             # get the table as a list of lists
             table = []
@@ -106,21 +107,13 @@ def get_pptx_slide_content(slide):
                         table_content += table[i][j] + "|"
                     table_content += "\n"
             slide_content["content"].append(table_content)
-    if slide_content["title"] == "":
-        if len(slide_content["content"]) > 0:
-            slide_content["title"] = slide_content["content"][0]
-            slide_content["content"].pop(0)
-        else:
-            slide_content["title"] = "No title"
-
     return slide_content
-
 
 def get_pptx_slides(presentation):
     pptx_slides = []
     for slide in presentation.slides:
         pptx_slide_content = get_pptx_slide_content(slide)
-        if pptx_slide_content["title"] == "No title" and len(pptx_slide_content["content"]) == 0:
+        if pptx_slide_content["title"] == "" or len(pptx_slide_content["content"]) == 0:
             continue
         else:
             pptx_slides.append(pptx_slide_content)
@@ -129,13 +122,14 @@ def get_pptx_slides(presentation):
 
 def get_pptx_presentation(file):
     presentation_dict = {"title": "", "slides": []}
-    subject = file.split("\\")[5]
+    subject = file.split("\\")[3]
+    presentation_dict["subject"] = subject
     subject_items = subject.split(" ", 1)
     try:
         prs = pptx.Presentation(file)
         pptx_slides = get_pptx_slides(prs)
         title_slide = pptx_slides[0]
-        if title_slide["title"] == subject_items[0] or title_slide["title"] == subject_items[-1]:
+        if title_slide["title"] == subject_items[-1] or title_slide["title"] == subject_items[0]:
             title_slide["title"] = title_slide["content"][0]
             title_slide["content"].pop(0)
         else:
@@ -145,6 +139,23 @@ def get_pptx_presentation(file):
     except pptx.exc.PackageNotFoundError:
         return None
     return presentation_dict
+
+class ObsidianVault:
+    def __init__(self, path):
+        self.path = path
+
+    def create_folder(self, folder_path):
+        if not os.path.exists(os.path.join(self.path, folder_path)):
+            os.mkdir(os.path.join(self.path, folder_path))
+        else:
+            pass
+
+    def create_file(self, file_path, content):
+        try:
+            with open(os.path.join(self.path, file_path), "w", encoding="utf-8") as file:
+                file.write(content)
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":

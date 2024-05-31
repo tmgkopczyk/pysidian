@@ -7,14 +7,13 @@ from html2text import html2text
 def get_filepaths(directory):
     file_paths = []
     for root, directories, filenames in os.walk(directory):
-        if "Theory" in root:
-            for filename in filenames:
-                filepath = os.path.join(root, filename)
-                file_paths.append(filepath)
+        for filename in filenames:
+            filepath = os.path.join(root, filename)
+            file_paths.append(filepath)
     return file_paths
 
 
-files = get_filepaths(r"D:\Algonquin College")
+files = get_filepaths(r"D:\Algonquin College\3 - Summer 2024\CST8371 - Introduction to Enterprise Networking\Lectures")
 
 
 def main():
@@ -24,7 +23,7 @@ def main():
         subject = file.split("\\")[3]
         if extension == "pptx":
             pptx_file = get_pptx_presentation(file)
-            print(pptx_file)
+            create_presentation_directory_structure(pptx_file)
         else:
             continue
         #else:
@@ -157,6 +156,60 @@ class ObsidianVault:
         except OSError:
             pass
 
+def create_presentation_directory_structure(presentation):
+    invalid_chars = re.compile(r"[\\/:*?<>|]")
+    presentation_title = re.sub(r"[\\/:*?<>|]","",presentation['title'])
+    presentation_folder = str(os.path.join(vault.path, presentation_title))
+    if not os.path.exists(presentation_folder):
+        os.mkdir(presentation_folder)
+    else:
+        pass
+    for slide in presentation['slides']:
+        slide_title = re.sub(r"[\\/:*?<>|]","",slide['title'])
+        if slide.get("section"):
+            slide_section = re.sub(r"[\\/:*?<>|]","", slide["section"])
+            section_path = os.path.join(presentation_folder,slide_section)
+            if not os.path.exists(section_path):
+                os.mkdir(section_path)
+            slide_path = os.path.join(section_path,slide_title)
+            try:
+                with open(f"{slide_path}.md","w",encoding="utf-8") as f:
+                    for content in slide["content"]:
+                        f.write(content)
+                        f.write("\n")
+            except OSError:
+                pass
+            if slide.get("pictures"):
+                for p_index, picture in enumerate(slide["pictures"]):
+                    try:
+                        with open(f"{slide_path}_{p_index}.png","wb") as image:
+                            image.write(picture)
+                        with open(f"{slide_path}.md","a",encoding="utf-8") as f:
+                            f.write("\n")
+                            f.write(f"![[{slide_title}_{p_index}.png]]")
+                    except OSError:
+                        pass
+
+        else:
+            slide_path = os.path.join(presentation_folder,slide_title)
+            try:
+                with open(f"{slide_path}.md","w",encoding="utf-8") as f:
+                    for content in slide["content"]:
+                        f.write(content)
+                        f.write("\n")
+            except OSError:
+                pass
+            if slide.get("pictures"):
+                for p_index, picture in enumerate(slide["pictures"]):
+                    try:
+                        with open(f"{slide_path}_{p_index}.png", "wb") as image:
+                            image.write(picture)
+                        with open(f"{slide_path}.md", "a", encoding="utf-8") as f:
+                            f.write("\n")
+                            f.write(f"![[{slide_title}_{p_index}.png]]")
+                    except OSError:
+                        pass
+vault = ObsidianVault(r"D:\Algonquin College\3 - Summer 2024\CST8371 - Introduction to Enterprise Networking\Notes")
 
 if __name__ == "__main__":
     main()

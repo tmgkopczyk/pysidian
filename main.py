@@ -1,9 +1,8 @@
 import os
 import pptx
 import re
-import pypdf
-from pypdf.errors import PdfReadError
 from html2text import html2text
+from time import sleep
 
 
 def get_filepaths(directory):
@@ -28,6 +27,7 @@ def main():
             if pptx_file is None:
                 continue
             else:
+                #pass
                 #print(pptx_file)
                 create_presentation_directory_structure(pptx_file)
         else:
@@ -53,23 +53,15 @@ def get_pptx_slide_content(slide):
         _title_list = [x for x in _slide_title.split("\x0b") if x.strip() != ""]
         if _title_list[0][-1].islower() and _title_list[1][0].islower():
             slide_title = " ".join([x.strip() for x in _title_list])
+            #print(_title_list)
         elif _title_list[0][-1] == ":" and _title_list[1][0].isupper():
             slide_title = " ".join([x.strip() for x in _title_list])
+            #print(_title_list)
         else:
             slide_content["title"] = _title_list[-1]
             slide_content["section"] = _title_list[0]
     else:
-        _title_list = re.findall("\x0b", _slide_title)
-        if len(_slide_title) == 1:
-            _title_list = " ".join([x.strip() for x in _slide_title.split("\x0b") if x.strip() != ""])
-
-        else:
-            _title_list = [x.strip() for x in _slide_title.splitlines() if x.strip() != ""]
-            if len(_slide_title) > 1:
-                if [x[0].strip().islower() for x in _slide_title[1:]] == [True] * (len(_slide_title) - 1):
-                    _slide_title = " ".join([x.strip() for x in _slide_title])
-                else:
-                    pass
+        pass
     if slide_title is None:
         slide_title = _slide_title
     else:
@@ -86,7 +78,10 @@ def get_pptx_slide_content(slide):
                     elif paragraph.text.strip() == "":
                         continue
                     else:
-                        slide_content["content"].append("\t" * paragraph.level + "- " + paragraph.text.strip())
+                        if paragraph.level > 0:
+                            slide_content["content"].append("\t" * paragraph.level + "- " + paragraph.text.strip())
+                        else:
+                            slide_content["content"].append(paragraph.text.strip())
         elif shape.has_table:
             # get the table as a list of lists
             table = []
@@ -100,6 +95,7 @@ def get_pptx_slide_content(slide):
                 table.append(table_row)
             # append the table to the slide content as a Markdown table
             table_content = ""
+            table_content += "\n"
             for i in range(len(table)):
                 # if it is the first row, then add the header and a separator
                 if i == 0:
@@ -148,7 +144,6 @@ def get_pptx_presentation(file):
     presentation_dict["subject"] = subject
     subject_items = subject.split(" ", 1)
     file_name = file.split("\\")[-1].split(".")[0]
-    print(file_name)
     try:
         prs = pptx.Presentation(file)
         pptx_slides = get_pptx_slides(prs)
@@ -159,7 +154,7 @@ def get_pptx_presentation(file):
         else:
             pass
         presentation_dict["title"] = file_name
-        presentation_dict["slides"] = pptx_slides[1:]
+        presentation_dict["slides"] = pptx_slides
     except pptx.exc.PackageNotFoundError:
         return None
     return presentation_dict
@@ -190,50 +185,53 @@ def create_presentation_directory_structure(presentation):
     else:
         pass
     for slide in presentation['slides']:
-        slide_title = re.sub(r"[\\/:*?<>|]","",slide['title'])
+        # if the slide has a "section" key, then create a folder for the section
         if slide.get("section"):
-            slide_section = re.sub(r"[\\/:*?<>|]","", slide["section"])
-            section_path = os.path.join(presentation_folder,slide_section)
-            if not os.path.exists(section_path):
-                os.mkdir(section_path)
-            slide_path = os.path.join(section_path,slide_title)
-            try:
-                with open(f"{slide_path}.md","w",encoding="utf-8") as f:
-                    for content in slide["content"]:
-                        f.write(content)
-                        f.write("\n")
-            except OSError:
+            section_folder = os.path.join(presentation_folder, slide["section"])
+            if not os.path.exists(section_folder):
+                os.mkdir(section_folder)
+            else:
                 pass
-            if slide.get("pictures"):
+        else:
+            section_folder = presentation_folder
+        # create a file for the slide content
+        slide_title = re.sub(r"[\\/:*?<>|]", "", slide["title"])
+        slide_file = os.path.join(section_folder, slide_title)
+        if os.path.exists(f"{slide_file}.md"):
+            with open(f"{slide_file}.md", "a", encoding="utf-8") as file:
+                file.write("***")
+                file.write("\n")
+                file.write("\n")
+                for content in slide["content"]:
+                    file.write(content)
+                    file.write("\n")
                 for p_index, picture in enumerate(slide["pictures"]):
-                    try:
-                        with open(f"{slide_path}_{p_index}.png","wb") as image:
-                            image.write(picture)
-                        with open(f"{slide_path}.md","a",encoding="utf-8") as f:
-                            f.write("\n")
-                            f.write(f"![[{slide_title}_{p_index}.png]]")
-                    except OSError:
-                        pass
+                    if os.path.exists(f"{slide_file}_{p_index}.png"):
+                        # if the picture already exists, then we need to increment the index untill there is no file with that name
+                        p_index += 1
+                    with open(f"{slide_file}_{p_index}.png", "wb") as image:
+                        image.write(picture)
+                    file.write(f"![[{slide_title}_{p_index}.png]]")
+                    file.write("\n")
+            sleep(1)
+            print(f"Appended to {slide_file}.md")
 
         else:
-            slide_path = os.path.join(presentation_folder,slide_title)
-            try:
-                with open(f"{slide_path}.md","w",encoding="utf-8") as f:
-                    for content in slide["content"]:
-                        f.write(content)
-                        f.write("\n")
-            except OSError:
-                pass
-            if slide.get("pictures"):
+            with open(f"{slide_file}.md", "w", encoding="utf-8") as file:
+                for content in slide["content"]:
+                    file.write(content)
+                    file.write("\n")
                 for p_index, picture in enumerate(slide["pictures"]):
-                    try:
-                        with open(f"{slide_path}_{p_index}.png", "wb") as image:
-                            image.write(picture)
-                        with open(f"{slide_path}.md", "a", encoding="utf-8") as f:
-                            f.write("\n")
-                            f.write(f"![[{slide_title}_{p_index}.png]]")
-                    except OSError:
-                        pass
+                    if os.path.exists(f"{slide_file}_{p_index}.png"):
+                        # if the picture already exists, then we need to increment the index untill there is no file with that name
+                        p_index += 1
+                    with open(f"{slide_file}_{p_index}.png", "wb") as image:
+                        image.write(picture)
+                    file.write(f"![[{slide_title}_{p_index}.png]]")
+                    file.write("\n")
+            sleep(1)
+            print(f"Created {slide_file}.md")
+
 
 vault = ObsidianVault(r"D:\Algonquin College\1 - Fall 2023\MAT8002 - Numeracy and Logic\Notes")
 

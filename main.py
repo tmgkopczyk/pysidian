@@ -15,7 +15,7 @@ def get_filepaths(directory):
     return file_paths
 
 
-files = get_filepaths(r"D:\Algonquin College\1 - Fall 2023\MAT8002 - Numeracy and Logic")
+files = get_filepaths(r"D:\Algonquin College\3 - Summer 2024\CST8316 - PC Troubleshooting")
 
 
 def main():
@@ -153,8 +153,8 @@ def get_pptx_presentation(file):
             title_slide["content"].pop(0)
         else:
             pass
-        presentation_dict["title"] = file_name
-        presentation_dict["slides"] = pptx_slides
+        presentation_dict["title"] = title_slide["title"]
+        presentation_dict["slides"] = pptx_slides[1:]
     except pptx.exc.PackageNotFoundError:
         return None
     return presentation_dict
@@ -176,64 +176,63 @@ class ObsidianVault:
         except OSError:
             pass
 
+
 def create_presentation_directory_structure(presentation):
     invalid_chars = re.compile(r"[\\/:*?<>|]")
     presentation_title = re.sub(r"[\\/:*?<>|]","",presentation['title'])
-    presentation_folder = str(os.path.join(vault.path, presentation_title))
+    presentation_folder = os.path.join(vault.path, presentation_title)
     if not os.path.exists(presentation_folder):
         os.mkdir(presentation_folder)
     else:
         pass
     for slide in presentation['slides']:
-        # if the slide has a "section" key, then create a folder for the section
+        slide_title = re.sub(r"[\\/:*?<>|]","",slide['title'])
         if slide.get("section"):
-            section_folder = os.path.join(presentation_folder, slide["section"])
-            if not os.path.exists(section_folder):
-                os.mkdir(section_folder)
-            else:
+            slide_section = re.sub(r"[\\/:*?<>|]","", slide["section"])
+            section_path = os.path.join(presentation_folder,slide_section)
+            if not os.path.exists(section_path):
+                os.mkdir(section_path)
+            slide_path = os.path.join(section_path,slide_title)
+            try:
+                with open(f"{slide_path}.md","w",encoding="utf-8") as f:
+                    for content in slide["content"]:
+                        f.write(content)
+                        f.write("\n")
+            except OSError:
                 pass
-        else:
-            section_folder = presentation_folder
-        # create a file for the slide content
-        slide_title = re.sub(r"[\\/:*?<>|]", "", slide["title"])
-        slide_file = os.path.join(section_folder, slide_title)
-        if os.path.exists(f"{slide_file}.md"):
-            with open(f"{slide_file}.md", "a", encoding="utf-8") as file:
-                file.write("***")
-                file.write("\n")
-                file.write("\n")
-                for content in slide["content"]:
-                    file.write(content)
-                    file.write("\n")
+            if slide.get("pictures"):
                 for p_index, picture in enumerate(slide["pictures"]):
-                    if os.path.exists(f"{slide_file}_{p_index}.png"):
-                        # if the picture already exists, then we need to increment the index untill there is no file with that name
-                        p_index += 1
-                    with open(f"{slide_file}_{p_index}.png", "wb") as image:
-                        image.write(picture)
-                    file.write(f"![[{slide_title}_{p_index}.png]]")
-                    file.write("\n")
+                    try:
+                        with open(f"{slide_path}_{p_index}.png","wb") as image:
+                            image.write(picture)
+                        with open(f"{slide_path}.md","a",encoding="utf-8") as f:
+                            f.write("\n")
+                            f.write(f"![[{slide_title}_{p_index}.png]]")
+                    except OSError:
+                        pass
             sleep(1)
-            print(f"Appended to {slide_file}.md")
-
         else:
-            with open(f"{slide_file}.md", "w", encoding="utf-8") as file:
-                for content in slide["content"]:
-                    file.write(content)
-                    file.write("\n")
+            slide_path = os.path.join(presentation_folder,slide_title)
+            try:
+                with open(f"{slide_path}.md","w",encoding="utf-8") as f:
+                    for content in slide["content"]:
+                        f.write(content)
+                        f.write("\n")
+            except OSError:
+                pass
+            if slide.get("pictures"):
                 for p_index, picture in enumerate(slide["pictures"]):
-                    if os.path.exists(f"{slide_file}_{p_index}.png"):
-                        # if the picture already exists, then we need to increment the index untill there is no file with that name
-                        p_index += 1
-                    with open(f"{slide_file}_{p_index}.png", "wb") as image:
-                        image.write(picture)
-                    file.write(f"![[{slide_title}_{p_index}.png]]")
-                    file.write("\n")
+                    try:
+                        with open(f"{slide_path}_{p_index}.png", "wb") as image:
+                            image.write(picture)
+                        with open(f"{slide_path}.md", "a", encoding="utf-8") as f:
+                            f.write("\n")
+                            f.write(f"![[{slide_title}_{p_index}.png]]")
+                    except OSError:
+                        pass
             sleep(1)
-            print(f"Created {slide_file}.md")
 
-
-vault = ObsidianVault(r"D:\Algonquin College\1 - Fall 2023\MAT8002 - Numeracy and Logic\Notes")
+vault = ObsidianVault(r"D:\Algonquin College\3 - Summer 2024\CST8316 - PC Troubleshooting\Notes")
 
 
 if __name__ == "__main__":
